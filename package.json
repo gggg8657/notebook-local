@@ -1,0 +1,8 @@
+{
+  "name": "notebook-local",
+  "private": true,
+  "description": "NotebookLM 클론 — kordoc(문서 파서) + 로컬 LLM 출처 인용 채팅·노트·스튜디오·팟캐스트",
+  "dependencies": {
+    "kordoc": "^4.17.2"
+  }
+}

@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>notebook local</title>
+<style>
+  :root{--bg:#fafaf8;--fg:#1f1f1f;--muted:#777;--line:#ddd;--acc:#2f6fed;--card:#fff}
+  body{font:14px/1.6 -apple-system,"Pretendard","Apple SD Gothic Neo",system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;height:100vh;display:flex;flex-direction:column}
+  header{display:flex;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--card)}
+  header h1{font-size:16px;margin:0}header h1 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+  main{flex:1;display:grid;grid-template-columns:270px 1fr 300px;min-height:0}
+  aside,section{overflow:auto;padding:12px}aside{border-right:1px solid var(--line)}.right{border-left:1px solid var(--line)}
+  h2{font-size:13px;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.03em}
+  select,button,input,textarea{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+  button{cursor:pointer}button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}button:disabled{opacity:.5}
+  button.sm{padding:2px 7px;font-size:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0}
+  .src{display:flex;gap:6px;align-items:flex-start}.src input{margin-top:3px}.src .name{font-weight:600;word-break:break-all}.src .sum{color:var(--muted);font-size:12px;white-space:pre-line}
+  .src.off .name{color:var(--muted);text-decoration:line-through}
+  .nb{cursor:pointer;padding:5px 8px;border-radius:6px}.nb.on{background:#e8efff;font-weight:600}
+  #chat{display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:860px}.msg.q{align-self:flex-end;background:#e8efff;padding:8px 12px;border-radius:12px}
+  .msg.a{white-space:pre-wrap}.msg.a .cite{display:inline-block;background:#dde6ff;color:#1f3f9f;border-radius:4px;padding:0 5px;font-size:11px;cursor:pointer;margin:0 1px}
+  .msg.a .tools{margin-top:4px}
+  .citecard{background:#fffbe6;border:1px solid #f0e2a0;border-radius:6px;padding:6px 8px;font-size:12px;margin:4px 0;white-space:pre-wrap}
+  #ask{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--card)}#ask textarea{flex:1;height:44px;resize:vertical}
+  .center{display:flex;flex-direction:column;min-height:0}.center>section{flex:1}
+  #stages{font-size:12px;color:var(--muted);min-height:1.2em;padding:0 12px}
+  .studio{display:grid;grid-template-columns:1fr 1fr;gap:6px}.studio button{text-align:left}
+  .note{cursor:pointer}.note .t{font-weight:600}.note .d{font-size:11px;color:var(--muted)}
+  pre{white-space:pre-wrap;background:#f1f1ee;padding:10px;border-radius:6px;font-size:13px}
+  dialog{border:1px solid var(--line);border-radius:10px;width:min(800px,92vw);max-height:85vh;padding:16px}dialog textarea{width:100%;height:50vh}
+  .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:#eee;color:#555;margin-left:4px}.badge.on{background:#dff5e1;color:#1a6b2a}
+  @media (max-width:900px){main{grid-template-columns:1fr}aside,.right{border:none}}
+</style>
+<header>
+  <h1>notebook local <small>— 출처 인용 채팅 · 노트 · 스튜디오</small></h1>
+  <label>모델 <select id="model"></select></label>
+  <span id="caps"></span>
+</header>
+<main>
+  <aside>
+    <h2>노트북 <button class="sm" id="nbNew">+ 새로</button></h2>
+    <div id="nbs"></div>
+    <h2>출처 <span class="badge" id="srcCount"></span></h2>
+    <input type="file" id="file" multiple accept=".hwp,.hwpx,.hml,.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.webp,.md,.txt">
+    <button class="sm" id="pasteBtn">글 붙여넣기</button>
+    <div id="srcs"></div>
+  </aside>
+  <div class="center">
+    <section id="chat"></section>
+    <div id="stages"></div>
+    <div id="ask"><textarea id="q" placeholder="출처에 대해 질문 (Enter = 전송, Shift+Enter = 줄바꿈)"></textarea><button class="primary" id="send">질문</button></div>
+  </div>
+  <aside class="right">
+    <h2>스튜디오</h2>
+    <div class="studio">
+      <button data-k="summary">📄 전체 요약</button><button data-k="faq">❓ FAQ</button>
+      <button data-k="guide">📚 스터디 가이드</button><button data-k="timeline">🕒 타임라인</button>
+      <button data-k="briefing">📋 브리핑 문서</button><button data-k="podcast">🎙 팟캐스트</button>
+    </div>
+    <div id="studioOut"></div>
+    <h2>노트 <button class="sm" id="noteNew">+ 새 노트</button></h2>
+    <div id="notes"></div>
+  </aside>
+</main>
+<dialog id="dlg"><h3 id="dlgT"></h3><input id="dlgTitle" style="width:100%;margin-bottom:6px"><textarea id="dlgBody"></textarea>
+  <div id="dlgAudio"></div>
+  <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end"><button id="dlgSrc">출처로 추가</button><button id="dlgDel">삭제</button><button class="primary" id="dlgSave">저장</button><button id="dlgClose">닫기</button></div></dialog>
+
+<script>
+const $ = id => document.getElementById(id); let NB = null, HIST = [];
+const b64 = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.onerror = no; r.readAsDataURL(f); });
+const post = (u, b) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+async function sse(u, body, on) {  // POST → SSE 이벤트 콜백, done 반환
+  const r = await post(u, body); const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', done = null;
+  while (true) { const { value, done: d } = await rd.read(); if (d) break; buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf('\n\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 2); if (!line.startsWith('data: ')) continue;
+      const ev = JSON.parse(line.slice(6)); if (ev.error) throw new Error(ev.error); if (ev.done) done = ev.done; on(ev); } }
+  return done;
+}
+const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const stage = ev => { if (ev.stage) $('stages').textContent = `${ev.stage}: ${ev.msg}`; };
+
+fetch('/api/models').then(r => r.json()).then(j => {
+  $('model').innerHTML = j.models.map(m => `<option ${m === j.default ? 'selected' : ''}>${m}</option>`).join('');
+  $('caps').innerHTML = `<span class="badge on">임베딩 ${j.embed}</span><span class="badge ${j.tts ? 'on' : ''}">TTS ${j.tts ? '연결' : '미연결'}</span>`;
+}).catch(() => $('stages').textContent = 'LLM 서버에 연결할 수 없습니다');
+
+async function loadNbs() {
+  const nbs = await fetch('/api/notebooks').then(r => r.json());
+  $('nbs').innerHTML = nbs.map(n => `<div class="nb ${n.id === NB ? 'on' : ''}" data-id="${n.id}">${esc(n.name)}</div>`).join('') || '<div style="color:#777">노트북을 만드세요</div>';
+  $('nbs').querySelectorAll('.nb').forEach(e => { e.onclick = () => open(e.dataset.id);
+    e.oncontextmenu = async ev => { ev.preventDefault(); const name = prompt('이름 변경 (비우면 삭제)', e.textContent); if (name === null) return;
+      await post('/api/notebooks', name ? { op: 'rename', id: e.dataset.id, name } : { op: 'delete', id: e.dataset.id }); if (!name && NB === e.dataset.id) NB = null; loadNbs(); }; });
+  if (!NB && nbs[0]) open(nbs[0].id);
+}
+$('nbNew').onclick = async () => { const name = prompt('노트북 이름'); if (!name) return; await post('/api/notebooks', { op: 'create', name }); NB = null; loadNbs(); };
+
+async function open(id) {
+  NB = id; HIST = []; $('chat').innerHTML = ''; $('studioOut').innerHTML = ''; loadNbs();
+  const j = await fetch('/api/nb/' + id).then(r => r.json());
+  $('srcCount').textContent = j.sources.length;
+  $('srcs').innerHTML = j.sources.map(s => `<div class="card src ${s.included ? '' : 'off'}"><input type="checkbox" ${s.included ? 'checked' : ''} data-id="${s.id}" title="포함/제외">
+    <div style="flex:1"><div class="name">${esc(s.name)} <span class="badge">${s.chunks}청크${s.embedded ? '' : ' · BM25'}</span></div><div class="sum">${esc(s.summary)}</div></div>
+    <button class="sm" data-del="${s.id}" title="삭제">×</button></div>`).join('');
+  $('srcs').querySelectorAll('input').forEach(e => e.onchange = async () => { await post(`/api/nb/${NB}/source`, { op: 'toggle', id: e.dataset.id }); open(NB); });
+  $('srcs').querySelectorAll('[data-del]').forEach(e => e.onclick = async () => { if (confirm('출처 삭제?')) { await post(`/api/nb/${NB}/source`, { op: 'delete', id: e.dataset.del }); open(NB); } });
+  $('notes').innerHTML = j.notes.map(n => `<div class="card note" data-id="${n.id}"><div class="t">${esc(n.title)}</div><div class="d">${n.created.slice(0, 16)}${/<!-- audio:/.test(n.body) ? ' 🎧' : ''}</div></div>`).join('') || '<div style="color:#777">없음</div>';
+  $('notes').querySelectorAll('.note').forEach(e => e.onclick = () => editNote(j.notes.find(n => n.id === e.dataset.id)));
+}
+
+async function addSource(body) {
+  if (!NB) return alert('노트북을 먼저 고르세요');
+  try { await sse(`/api/nb/${NB}/source`, { ...body, model: $('model').value }, stage); $('stages').textContent = '출처 추가 완료'; open(NB); }
+  catch (e) { $('stages').textContent = '오류: ' + e.message; }
+}
+$('file').onchange = async () => { for (const f of $('file').files) await addSource({ file_name: f.name, file_b64: await b64(f) }); $('file').value = ''; };
+$('pasteBtn').onclick = () => { const text = prompt('붙여넣을 글'); if (text) addSource({ name: '붙여넣은 글 ' + new Date().toLocaleTimeString(), text }); };
+
+function render(el, text, cites) {
+  el.innerHTML = esc(text).replace(/\[(\d+)\]/g, (m, n) => cites[n - 1] ? `<span class="cite" data-n="${n}">${n}</span>` : m);
+  el.querySelectorAll('.cite').forEach(c => c.onclick = () => { const x = cites[c.dataset.n - 1]; let card = el.querySelector(`.citecard[data-n="${c.dataset.n}"]`);
+    if (card) return card.remove(); card = document.createElement('div'); card.className = 'citecard'; card.dataset.n = c.dataset.n;
+    card.textContent = `[${x.n}] ${x.source}${x.heading ? ' > ' + x.heading : ''}\n${x.text}`; c.after(card); });
+}
+$('q').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send').click(); } };
+$('send').onclick = async () => {
+  const question = $('q').value.trim(); if (!question || !NB) return; $('q').value = ''; $('send').disabled = true;
+  $('chat').insertAdjacentHTML('beforeend', `<div class="msg q">${esc(question)}</div><div class="msg a"></div>`);
+  const el = $('chat').lastElementChild; let cites = [], text = '';
+  try {
+    const done = await sse(`/api/nb/${NB}/chat`, { question, history: HIST.slice(-6).join('\n'), model: $('model').value }, ev => {
+      stage(ev); if (ev.cites) { cites = ev.cites; $('stages').textContent = `검색 ${ev.mode} · 발췌 ${cites.length}개`; }
+      if (ev.token) { text += ev.token; el.textContent = text; $('chat').scrollTop = $('chat').scrollHeight; } });
+    render(el, done.answer, cites); HIST.push('Q: ' + question, 'A: ' + done.answer.slice(0, 400));
+    const t = document.createElement('div'); t.className = 'tools'; t.innerHTML = '<button class="sm">노트에 저장</button>';
+    t.firstChild.onclick = async () => { await post(`/api/nb/${NB}/note`, { op: 'save', title: question.slice(0, 40), body: `**Q. ${question}**\n\n${done.answer}` }); open(NB); t.firstChild.textContent = '저장됨'; };
+    el.appendChild(t);
+  } catch (e) { el.textContent = '오류: ' + e.message; }
+  $('send').disabled = false;
+};
+
+document.querySelectorAll('.studio button').forEach(b => b.onclick = async () => {
+  if (!NB) return; const kind = b.dataset.k; $('studioOut').innerHTML = `<pre id="sp">생성 중…</pre>`; let text = '';
+  try { const done = await sse(`/api/nb/${NB}/studio`, { kind, model: $('model').value }, ev => { stage(ev); if (ev.reset) text = ''; if (ev.token) { text += ev.token; $('sp').textContent = text; } });
+    $('sp').textContent = done.body; if (kind === 'podcast') $('studioOut').insertAdjacentHTML('afterbegin', done.audio ? `<audio controls src="/api/nb/${NB}/audio/${done.audio}"></audio>` : `<span class="badge">${done.tts ? 'TTS 실패' : 'TTS 서버 미연결 — 대본만'}</span>`);
+    $('stages').textContent = '노트에 저장됨'; open(NB);
+  } catch (e) { $('studioOut').innerHTML = '오류: ' + esc(e.message); }
+});
+
+let CUR = null;
+function editNote(n) { CUR = n; $('dlgT').textContent = n ? '노트' : '새 노트'; $('dlgTitle').value = n ? n.title : ''; $('dlgBody').value = n ? n.body.replace(/\n*<!-- audio:.*-->/, '') : '';
+  const a = n && n.body.match(/<!-- audio: (\S+) -->/); $('dlgAudio').innerHTML = a ? `<audio controls src="/api/nb/${NB}/audio/${a[1]}"></audio>` : ''; $('dlg').showModal(); }
+$('noteNew').onclick = () => editNote(null);
+$('dlgClose').onclick = () => $('dlg').close();
+$('dlgSave').onclick = async () => { await post(`/api/nb/${NB}/note`, { op: 'save', id: CUR && CUR.id, title: $('dlgTitle').value, body: $('dlgBody').value }); $('dlg').close(); open(NB); };
+$('dlgDel').onclick = async () => { if (CUR && confirm('삭제?')) { await post(`/api/nb/${NB}/note`, { op: 'delete', id: CUR.id }); $('dlg').close(); open(NB); } };
+$('dlgSrc').onclick = async () => { if (!CUR) return; await post(`/api/nb/${NB}/note`, { op: 'to_source', id: CUR.id, model: $('model').value }); $('dlg').close(); open(NB); };
+loadNbs();
+</script>
