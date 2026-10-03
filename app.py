@@ -50,7 +50,7 @@ EXTS = (".hwp", ".hwpx", ".hml", ".pdf", ".docx", ".xlsx", ".xls", ".png", ".jpg
 STUDIO = ("summary", "faq", "guide", "timeline", "briefing", "podcast")
 STUDIO_LABEL = {"summary": "전체 요약", "faq": "FAQ", "guide": "스터디 가이드", "timeline": "타임라인", "briefing": "브리핑 문서", "podcast": "팟캐스트 대본"}
 _CLI = os.path.join(ROOT, "node_modules", "kordoc", "dist", "cli.js")
-KORDOC = ["node", _CLI] if os.path.exists(_CLI) else ["npx", "-y", "kordoc@^4"]
+KORDOC = ["node", _CLI]  # npx 폴백 없음 — 폐쇄망에서 npx 는 무한 대기
 
 
 def read(p):
@@ -144,12 +144,11 @@ def models():
         return [m["name"] for m in json.load(r)["models"]]
 
 
-_embed_down = [False]  # ponytail: 한 번 실패하면 이 프로세스에선 BM25 만 (재시작으로 복구)
 
 
 def embed(texts):
     """임베딩 벡터 리스트. 실패하면 None → 호출자가 BM25 로 폴백."""
-    if not texts or _embed_down[0]:
+    if not texts:
         return None
     try:
         if LLM_API == "openai":
@@ -161,7 +160,6 @@ def embed(texts):
             return json.load(r)["embeddings"]
     except Exception as e:
         print(f"[embed] 실패 → BM25 폴백: {type(e).__name__}: {str(e)[:120]}", file=sys.stderr)
-        _embed_down[0] = True
         return None
 
 
@@ -296,6 +294,16 @@ def rrf(*ranked, k=60):
     return [cid for cid, _ in s.most_common()]
 
 
+_VEC = {}  # ponytail: chunk id → 파싱된 벡터 캐시 (프로세스 수명), 수만 청크면 메모리 확인
+
+
+def vec(r):
+    v = _VEC.get(r["id"])
+    if v is None:
+        v = _VEC[r["id"]] = json.loads(r["emb"])
+    return v
+
+
 def retrieve(c, nb, question, top_k=TOP_K):
     rows = c.execute("SELECT ch.* , s.name AS sname FROM chunks ch JOIN sources s ON s.id=ch.src WHERE ch.nb=? AND s.included=1", (nb,)).fetchall()
     if not rows:
@@ -304,7 +312,7 @@ def retrieve(c, nb, question, top_k=TOP_K):
     qv = embed([question]) if any(r["emb"] for r in rows) else None
     mode = "bm25"
     if qv:
-        sem = sorted([(r["id"], cosine(qv[0], json.loads(r["emb"]))) for r in rows if r["emb"]], key=lambda x: -x[1])[:top_k * 3]
+        sem = sorted([(r["id"], cosine(qv[0], vec(r))) for r in rows if r["emb"]], key=lambda x: -x[1])[:top_k * 3]
         order = rrf(lex[:top_k * 3], sem)
         mode = "hybrid"
     else:
@@ -574,6 +582,6 @@ if __name__ == "__main__":
             print(studio(nb, sys.argv[4], MODEL, log)["body"])
         sys.exit(0)
     if not os.path.exists(_CLI):
-        print("경고: node_modules/kordoc 없음 → npx 로 대체 (느림). 이 폴더에서 `npm install` 권장", file=sys.stderr)
+        sys.exit("node_modules/kordoc 없음 — 이 폴더에서 `npm install` 또는 pack.sh 번들을 쓰세요")
     print(f"notebook local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} model={MODEL} embed={EMBED_MODEL} tts={TTS_BASE or '없음'})")
     ThreadingHTTPServer(("", PORT), H).serve_forever()
