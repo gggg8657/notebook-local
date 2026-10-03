@@ -81,37 +81,37 @@ async function sse(u, body, on) {  // POST → SSE 이벤트 콜백, done 반환
 const esc = s => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const stage = ev => { if (ev.stage) $('stages').textContent = `${ev.stage}: ${ev.msg}`; };
 
-fetch('/api/models').then(r => r.json()).then(j => {
+fetch('api/models').then(r => r.json()).then(j => {
   $('model').innerHTML = j.models.map(m => `<option ${m === j.default ? 'selected' : ''}>${m}</option>`).join('');
   $('caps').innerHTML = `<span class="badge on">임베딩 ${j.embed}</span><span class="badge ${j.tts ? 'on' : ''}">TTS ${j.tts ? '연결' : '미연결'}</span>`;
 }).catch(() => $('stages').textContent = 'LLM 서버에 연결할 수 없습니다');
 
 async function loadNbs() {
-  const nbs = await fetch('/api/notebooks').then(r => r.json());
+  const nbs = await fetch('api/notebooks').then(r => r.json());
   $('nbs').innerHTML = nbs.map(n => `<div class="nb ${n.id === NB ? 'on' : ''}" data-id="${n.id}">${esc(n.name)}</div>`).join('') || '<div style="color:#777">노트북을 만드세요</div>';
   $('nbs').querySelectorAll('.nb').forEach(e => { e.onclick = () => open(e.dataset.id);
     e.oncontextmenu = async ev => { ev.preventDefault(); const name = prompt('이름 변경 (비우면 삭제)', e.textContent); if (name === null) return;
-      await post('/api/notebooks', name ? { op: 'rename', id: e.dataset.id, name } : { op: 'delete', id: e.dataset.id }); if (!name && NB === e.dataset.id) NB = null; loadNbs(); }; });
+      await post('api/notebooks', name ? { op: 'rename', id: e.dataset.id, name } : { op: 'delete', id: e.dataset.id }); if (!name && NB === e.dataset.id) NB = null; loadNbs(); }; });
   if (!NB && nbs[0]) open(nbs[0].id);
 }
-$('nbNew').onclick = async () => { const name = prompt('노트북 이름'); if (!name) return; await post('/api/notebooks', { op: 'create', name }); NB = null; loadNbs(); };
+$('nbNew').onclick = async () => { const name = prompt('노트북 이름'); if (!name) return; await post('api/notebooks', { op: 'create', name }); NB = null; loadNbs(); };
 
 async function open(id) {
   NB = id; HIST = []; $('chat').innerHTML = ''; $('studioOut').innerHTML = ''; loadNbs();
-  const j = await fetch('/api/nb/' + id).then(r => r.json());
+  const j = await fetch('api/nb/' + id).then(r => r.json());
   $('srcCount').textContent = j.sources.length;
   $('srcs').innerHTML = j.sources.map(s => `<div class="card src ${s.included ? '' : 'off'}"><input type="checkbox" ${s.included ? 'checked' : ''} data-id="${s.id}" title="포함/제외">
     <div style="flex:1"><div class="name">${esc(s.name)} <span class="badge">${s.chunks}청크${s.embedded ? '' : ' · BM25'}</span></div><div class="sum">${esc(s.summary)}</div></div>
     <button class="sm" data-del="${s.id}" title="삭제">×</button></div>`).join('');
-  $('srcs').querySelectorAll('input').forEach(e => e.onchange = async () => { await post(`/api/nb/${NB}/source`, { op: 'toggle', id: e.dataset.id }); open(NB); });
-  $('srcs').querySelectorAll('[data-del]').forEach(e => e.onclick = async () => { if (confirm('출처 삭제?')) { await post(`/api/nb/${NB}/source`, { op: 'delete', id: e.dataset.del }); open(NB); } });
+  $('srcs').querySelectorAll('input').forEach(e => e.onchange = async () => { await post(`api/nb/${NB}/source`, { op: 'toggle', id: e.dataset.id }); open(NB); });
+  $('srcs').querySelectorAll('[data-del]').forEach(e => e.onclick = async () => { if (confirm('출처 삭제?')) { await post(`api/nb/${NB}/source`, { op: 'delete', id: e.dataset.del }); open(NB); } });
   $('notes').innerHTML = j.notes.map(n => `<div class="card note" data-id="${n.id}"><div class="t">${esc(n.title)}</div><div class="d">${n.created.slice(0, 16)}${/<!-- audio:/.test(n.body) ? ' 🎧' : ''}</div></div>`).join('') || '<div style="color:#777">없음</div>';
   $('notes').querySelectorAll('.note').forEach(e => e.onclick = () => editNote(j.notes.find(n => n.id === e.dataset.id)));
 }
 
 async function addSource(body) {
   if (!NB) return alert('노트북을 먼저 고르세요');
-  try { await sse(`/api/nb/${NB}/source`, { ...body, model: $('model').value }, stage); $('stages').textContent = '출처 추가 완료'; open(NB); }
+  try { await sse(`api/nb/${NB}/source`, { ...body, model: $('model').value }, stage); $('stages').textContent = '출처 추가 완료'; open(NB); }
   catch (e) { $('stages').textContent = '오류: ' + e.message; }
 }
 $('file').onchange = async () => { for (const f of $('file').files) await addSource({ file_name: f.name, file_b64: await b64(f) }); $('file').value = ''; };
@@ -129,12 +129,12 @@ $('send').onclick = async () => {
   $('chat').insertAdjacentHTML('beforeend', `<div class="msg q">${esc(question)}</div><div class="msg a"></div>`);
   const el = $('chat').lastElementChild; let cites = [], text = '';
   try {
-    const done = await sse(`/api/nb/${NB}/chat`, { question, history: HIST.slice(-6).join('\n'), model: $('model').value }, ev => {
+    const done = await sse(`api/nb/${NB}/chat`, { question, history: HIST.slice(-6).join('\n'), model: $('model').value }, ev => {
       stage(ev); if (ev.cites) { cites = ev.cites; $('stages').textContent = `검색 ${ev.mode} · 발췌 ${cites.length}개`; }
       if (ev.token) { text += ev.token; el.textContent = text; $('chat').scrollTop = $('chat').scrollHeight; } });
     render(el, done.answer, cites); HIST.push('Q: ' + question, 'A: ' + done.answer.slice(0, 400));
     const t = document.createElement('div'); t.className = 'tools'; t.innerHTML = '<button class="sm">노트에 저장</button>';
-    t.firstChild.onclick = async () => { await post(`/api/nb/${NB}/note`, { op: 'save', title: question.slice(0, 40), body: `**Q. ${question}**\n\n${done.answer}` }); open(NB); t.firstChild.textContent = '저장됨'; };
+    t.firstChild.onclick = async () => { await post(`api/nb/${NB}/note`, { op: 'save', title: question.slice(0, 40), body: `**Q. ${question}**\n\n${done.answer}` }); open(NB); t.firstChild.textContent = '저장됨'; };
     el.appendChild(t);
   } catch (e) { el.textContent = '오류: ' + e.message; }
   $('send').disabled = false;
@@ -142,19 +142,19 @@ $('send').onclick = async () => {
 
 document.querySelectorAll('.studio button').forEach(b => b.onclick = async () => {
   if (!NB) return; const kind = b.dataset.k; $('studioOut').innerHTML = `<pre id="sp">생성 중…</pre>`; let text = '';
-  try { const done = await sse(`/api/nb/${NB}/studio`, { kind, model: $('model').value }, ev => { stage(ev); if (ev.reset) text = ''; if (ev.token) { text += ev.token; $('sp').textContent = text; } });
-    $('sp').textContent = done.body; if (kind === 'podcast') $('studioOut').insertAdjacentHTML('afterbegin', done.audio ? `<audio controls src="/api/nb/${NB}/audio/${done.audio}"></audio>` : `<span class="badge">${done.tts ? 'TTS 실패' : 'TTS 서버 미연결 — 대본만'}</span>`);
+  try { const done = await sse(`api/nb/${NB}/studio`, { kind, model: $('model').value }, ev => { stage(ev); if (ev.reset) text = ''; if (ev.token) { text += ev.token; $('sp').textContent = text; } });
+    $('sp').textContent = done.body; if (kind === 'podcast') $('studioOut').insertAdjacentHTML('afterbegin', done.audio ? `<audio controls src="api/nb/${NB}/audio/${done.audio}"></audio>` : `<span class="badge">${done.tts ? 'TTS 실패' : 'TTS 서버 미연결 — 대본만'}</span>`);
     $('stages').textContent = '노트에 저장됨'; open(NB);
   } catch (e) { $('studioOut').innerHTML = '오류: ' + esc(e.message); }
 });
 
 let CUR = null;
 function editNote(n) { CUR = n; $('dlgT').textContent = n ? '노트' : '새 노트'; $('dlgTitle').value = n ? n.title : ''; $('dlgBody').value = n ? n.body.replace(/\n*<!-- audio:.*-->/, '') : '';
-  const a = n && n.body.match(/<!-- audio: (\S+) -->/); $('dlgAudio').innerHTML = a ? `<audio controls src="/api/nb/${NB}/audio/${a[1]}"></audio>` : ''; $('dlg').showModal(); }
+  const a = n && n.body.match(/<!-- audio: (\S+) -->/); $('dlgAudio').innerHTML = a ? `<audio controls src="api/nb/${NB}/audio/${a[1]}"></audio>` : ''; $('dlg').showModal(); }
 $('noteNew').onclick = () => editNote(null);
 $('dlgClose').onclick = () => $('dlg').close();
-$('dlgSave').onclick = async () => { await post(`/api/nb/${NB}/note`, { op: 'save', id: CUR && CUR.id, title: $('dlgTitle').value, body: $('dlgBody').value }); $('dlg').close(); open(NB); };
-$('dlgDel').onclick = async () => { if (CUR && confirm('삭제?')) { await post(`/api/nb/${NB}/note`, { op: 'delete', id: CUR.id }); $('dlg').close(); open(NB); } };
-$('dlgSrc').onclick = async () => { if (!CUR) return; await post(`/api/nb/${NB}/note`, { op: 'to_source', id: CUR.id, model: $('model').value }); $('dlg').close(); open(NB); };
+$('dlgSave').onclick = async () => { await post(`api/nb/${NB}/note`, { op: 'save', id: CUR && CUR.id, title: $('dlgTitle').value, body: $('dlgBody').value }); $('dlg').close(); open(NB); };
+$('dlgDel').onclick = async () => { if (CUR && confirm('삭제?')) { await post(`api/nb/${NB}/note`, { op: 'delete', id: CUR.id }); $('dlg').close(); open(NB); } };
+$('dlgSrc').onclick = async () => { if (!CUR) return; await post(`api/nb/${NB}/note`, { op: 'to_source', id: CUR.id, model: $('model').value }); $('dlg').close(); open(NB); };
 loadNbs();
 </script>
