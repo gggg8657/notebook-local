@@ -1,0 +1,14 @@
+notebook-local
+==============
+
+This package wraps (does not modify) the following open-source software:
+
+  kordoc — https://github.com/chrisryugj/kordoc
+  Copyright (c) chrisryugj. Licensed under the MIT License (see LICENSE-kordoc).
+  Installed unmodified from npm (kordoc ^4.17) for document parsing/OCR.
+
+Design inspired by Google NotebookLM (no code shared). Embedding model (e.g. BAAI bge-m3, MIT) and
+TTS server (e.g. Kokoro, Apache-2.0) are external services configured by environment variables.
+
+Files authored for this package (MIT):
+  app.py, ui.html, goal-prompt.md, selftest.py, setup.sh, pack.sh, README.md
