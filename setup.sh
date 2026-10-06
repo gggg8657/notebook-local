@@ -174,7 +174,7 @@ fi
 
 # ── 7. 자가검증 ──────────────────────────────────────────────────────────
 step "자가검증"
-spin "청크·BM25·하이브리드 검색·인용·노트·kordoc 파싱" "$PY" selftest.py || die "selftest 실패 — node_modules/kordoc 또는 sample/ 이 빠졌는지 확인"
+spin "청크·BM25·하이브리드 검색·인용·노트·kordoc 파싱" env -u WORKSPACE "$PY" selftest.py || die "selftest 실패 — node_modules/kordoc 또는 sample/ 이 빠졌는지 확인"
 ok "검색·인용·노트·파싱 통과"
 
 # ── 8. 웹 서버 ───────────────────────────────────────────────────────────
