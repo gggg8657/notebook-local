@@ -58,3 +58,6 @@ WITH_NODE=1 ./pack.sh          # Node 바이너리까지
 ## 파일
 
 `app.py` 서버+파이프라인 · `ui.html` · `goal-prompt.md` 역할 프롬프트(요약·채팅·스튜디오 6종) · `selftest.py` · `setup.sh` · `pack.sh` · `package.json`(kordoc ^4.17). 출처·라이선스는 `NOTICE`.
+
+### ✍ 윤문하기
+노트 편집 창·스튜디오 결과 아래에 "윤문하기" 막대(가볍게·보통·적극). kordoc-local 의 글 윤문 API(`KORDOC_URL`, 기본 `http://localhost:8766`)를 부르며, kordoc 이 안 떠 있으면 막대가 숨는다. 숫자·날짜·고유 표기가 바뀐 곳은 원문 유지, "바뀐 곳 보기"로 어절 단위 비교.
