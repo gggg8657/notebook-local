@@ -61,3 +61,12 @@ WITH_NODE=1 ./pack.sh          # Node 바이너리까지
 
 ### ✍ 윤문하기
 노트 편집 창·스튜디오 결과 아래에 "윤문하기" 막대(가볍게·보통·적극). kordoc-local 의 글 윤문 API(`KORDOC_URL`, 기본 `http://localhost:8766`)를 부르며, kordoc 이 안 떠 있으면 막대가 숨는다. 숫자·날짜·고유 표기가 바뀐 곳은 원문 유지, "바뀐 곳 보기"로 어절 단위 비교.
+
+## 출처·감사 (Credits)
+
+- [kordoc](https://github.com/chrisryugj/kordoc) (MIT, chrisryugj) — 문서 파싱·OCR (npm 에서 수정 없이 설치, `LICENSE-kordoc`)
+- 기획 참고: Google NotebookLM (코드 공유 없음). 임베딩(예: [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3), MIT)·TTS 서버(예: Kokoro, Apache-2.0, 또는 [tts-local](https://github.com/gggg8657/tts-local))는 환경변수로 연결하는 외부 서비스
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
+
+저작권 표기·전체 목록은 `NOTICE` 를 보세요.
