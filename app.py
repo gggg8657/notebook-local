@@ -39,8 +39,9 @@ MODEL = os.environ.get("LLM_MODEL", "qwen3:8b")
 LLM_KEY = os.environ.get("LLM_API_KEY", "")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "bge-m3")
 TTS_BASE = os.environ.get("TTS_BASE_URL", "").rstrip("/")   # OpenAI 호환 /v1/audio/speech (예: http://localhost:8771/v1)
-TTS_MODEL = os.environ.get("TTS_MODEL", "kokoro")
-TTS_VOICES = (os.environ.get("TTS_VOICE_A", "af_heart"), os.environ.get("TTS_VOICE_B", "am_adam"))
+TTS_MODEL = os.environ.get("TTS_MODEL", "melo")
+_V = os.environ.get("TTS_VOICE", "KR")  # tts-local(MeloTTS 한국어)은 화자 1개 — 두 사람 목소리는 TTS_VOICE_A/B 로 따로 줄 수 있는 서버일 때만 다르다
+TTS_VOICES = (os.environ.get("TTS_VOICE_A", _V), os.environ.get("TTS_VOICE_B", _V))
 PORT = int(os.environ.get("PORT", "8769"))
 NUM_CTX = int(os.environ.get("NUM_CTX", "16384"))
 MAX_CHARS = int(os.environ.get("MAX_CHARS", "20000"))   # 스튜디오에 넣는 출처 본문 상한
@@ -431,6 +432,28 @@ def studio(nb, kind, model=MODEL, emit=lambda ev: None):
 # ── HTTP ───────────────────────────────────────────────────────────────
 HTML = read(os.path.join(ROOT, "ui.html")) if os.path.exists(os.path.join(ROOT, "ui.html")) else "ui.html 없음"
 
+
+# ── 윤문하기: kordoc-local 의 글 윤문 API (숫자·날짜·고유 표기가 바뀐 조각은 원문 유지) ─────────
+KORDOC_URL = os.environ.get("KORDOC_URL", "http://localhost:8766").rstrip("/")
+
+
+def polish_remote(text, strength="standard"):
+    req = urllib.request.Request(KORDOC_URL + "/api/polish_text", json.dumps({"text": text, "strength": strength}).encode(),
+                                 {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=1800) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(json.loads(e.read() or b"{}").get("error") or f"kordoc HTTP {e.code}")
+
+
+def polish_ok():
+    try:
+        urllib.request.urlopen(KORDOC_URL + "/api/models", timeout=2)
+        return True
+    except Exception:
+        return False
+
 # ── 저작권 표기 (LICENSE·NOTICE 참고) ─────────────────────────────────────
 _SIG = __import__("base64").b64decode("wqkgMjAyNiDquYDrj5nso7wgwrcgZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20=").decode()
 _SIG_A = __import__("base64").b64decode("RG9uZ0p1IEtpbSA8ZG9uZ2p1a2ltLmRldkBnbWFpbC5jb20+").decode()
@@ -477,6 +500,8 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             c = db()
+            if self.path == "/api/polish_ok":
+                return self._send({"ok": polish_ok()})
             if self.path == "/api/models":
                 return self._send({"models": models(), "default": MODEL, "embed": EMBED_MODEL, "tts": bool(TTS_BASE)})
             if self.path == "/api/notebooks":
@@ -502,6 +527,8 @@ class H(BaseHTTPRequestHandler):
         req = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"{}")
         c = db()
         try:
+            if self.path == "/api/polish":
+                return self._send(polish_remote(req.get("text", ""), req.get("strength") or "standard"))
             if self.path == "/api/notebooks":
                 op = req.get("op", "create")
                 if op == "create":
