@@ -31,7 +31,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
-DB = os.path.join(WS, "notebook.db")
 LLM_API = os.environ.get("LLM_API", "ollama")            # ollama | openai (vLLM·LM Studio·llama.cpp 등)
 LLM_BASE = os.environ.get("LLM_BASE_URL", "http://localhost:8000/v1" if LLM_API == "openai" else "http://localhost:11434").rstrip("/")
 OLLAMA = LLM_BASE
@@ -179,9 +178,10 @@ def prompts():
 
 
 # ── 저장소 ──────────────────────────────────────────────────────────────
-def db():
-    os.makedirs(WS, exist_ok=True)
-    c = sqlite3.connect(DB)
+def db(ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
+    os.makedirs(ws, exist_ok=True)
+    c = sqlite3.connect(os.path.join(ws, "notebook.db"))  # 사용자마다 자기 폴더의 DB
     c.row_factory = sqlite3.Row
     c.executescript("""
     CREATE TABLE IF NOT EXISTS notebooks(id TEXT PRIMARY KEY, name TEXT, created TEXT);
@@ -323,10 +323,11 @@ def retrieve(c, nb, question, top_k=TOP_K):
 
 
 # ── 파이프라인 ──────────────────────────────────────────────────────────
-def add_source(nb, name, text=None, file=None, model=MODEL, emit=lambda ev: None):
-    c = db()
+def add_source(nb, name, text=None, file=None, model=MODEL, emit=lambda ev: None, ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
+    c = db(ws)
     sid = nid()
-    d = os.path.join(WS, nb, sid)
+    d = os.path.join(ws, nb, sid)
     os.makedirs(d, exist_ok=True)
     if file:
         if not file.lower().endswith(EXTS):
@@ -361,8 +362,9 @@ def add_source(nb, name, text=None, file=None, model=MODEL, emit=lambda ev: None
     return {"id": sid, "name": name, "kind": kind, "chunks": len(chunks), "summary": summary, "embedded": bool(vecs)}
 
 
-def ask(nb, question, history="", model=MODEL, emit=lambda ev: None):
-    c = db()
+def ask(nb, question, history="", model=MODEL, emit=lambda ev: None, ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
+    c = db(ws)
     hits, mode = retrieve(c, nb, question)
     cites = [{"n": i + 1, "id": h["id"], "source": h["sname"], "heading": h["heading"], "text": h["text"]} for i, h in enumerate(hits)]
     emit({"cites": cites, "mode": mode})
@@ -383,10 +385,11 @@ def source_text(c, nb, limit=MAX_CHARS):
     return "\n\n".join(parts), any(len(r["text"]) > per for r in rows)
 
 
-def studio(nb, kind, model=MODEL, emit=lambda ev: None):
+def studio(nb, kind, model=MODEL, emit=lambda ev: None, ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
     if kind not in STUDIO:
         raise ValueError(f"kind 는 {STUDIO} 중 하나")
-    c = db()
+    c = db(ws)
     text, truncated = source_text(c, nb)
     if not text:
         raise ValueError("포함된 출처가 없습니다")
@@ -399,7 +402,7 @@ def studio(nb, kind, model=MODEL, emit=lambda ev: None):
     audio = None
     if kind == "podcast" and TTS_BASE:
         lines = [(m.group(1), m.group(2).strip()) for m in re.finditer(r"^\s*([AB])\s*[:：]\s*(.+)$", out, re.M)]
-        d = os.path.join(WS, nb, "audio")
+        d = os.path.join(ws, nb, "audio")
         os.makedirs(d, exist_ok=True)
         parts = []
         try:
@@ -430,6 +433,23 @@ def studio(nb, kind, model=MODEL, emit=lambda ev: None):
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────
+def user_ws(h):
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
+    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    if u == "owner":
+        return WS
+    d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def ws_dir(ws, *parts):
+    """id 로 만든 사용자 폴더 안 경로 — 밖(남의 폴더·u/)을 가리키면 거절"""
+    if not all(re.fullmatch(r"[0-9a-f]+", p or "") for p in parts):
+        raise ValueError("잘못된 id")
+    return os.path.join(ws, *parts)
+
+
 HTML = read(os.path.join(ROOT, "ui.html")) if os.path.exists(os.path.join(ROOT, "ui.html")) else "ui.html 없음"
 
 
@@ -499,7 +519,8 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            c = db()
+            ws = user_ws(self)
+            c = db(ws)
             if self.path == "/api/polish_ok":
                 return self._send({"ok": polish_ok()})
             if self.path == "/api/models":
@@ -515,17 +536,18 @@ class H(BaseHTTPRequestHandler):
                     "notes": [dict(r) for r in c.execute("SELECT * FROM notes WHERE nb=? ORDER BY created DESC", (nb,))]})
             m = re.fullmatch(r"/api/nb/(\w+)/audio/([\w-]+\.mp3)", self.path)
             if m:
-                with open(os.path.join(WS, m.group(1), "audio", m.group(2)), "rb") as f:
+                with open(os.path.join(ws_dir(ws, m.group(1)), "audio", m.group(2)), "rb") as f:
                     return self._send(f.read(), "audio/mpeg")
             self._send(signed(HTML).encode(), "text/html; charset=utf-8")
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             self._send({"error": "없음"}, code=404)
         except Exception as e:
             self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
 
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"{}")
-        c = db()
+        ws = user_ws(self)
+        c = db(ws)
         try:
             if self.path == "/api/polish":
                 return self._send(polish_remote(req.get("text", ""), req.get("strength") or "standard"))
@@ -539,13 +561,14 @@ class H(BaseHTTPRequestHandler):
                 elif op == "delete":
                     for t in ("notebooks", "sources", "chunks", "notes"):
                         c.execute(f"DELETE FROM {t} WHERE {'id' if t == 'notebooks' else 'nb'}=?", (req["id"],))
-                    shutil.rmtree(os.path.join(WS, req["id"]), ignore_errors=True)
+                    shutil.rmtree(ws_dir(ws, req["id"]), ignore_errors=True)
                 c.commit()
                 return self._send({"ok": True})
             m = re.fullmatch(r"/api/nb/(\w+)/(source|chat|note|studio)", self.path)
             if not m:
                 return self._send({"error": "없는 경로"}, code=404)
             nb, what = m.groups()
+            ws_dir(ws, nb)
             if what == "source":
                 op = req.get("op", "add")
                 if op == "toggle":
@@ -553,18 +576,18 @@ class H(BaseHTTPRequestHandler):
                     return self._send({"ok": True})
                 if op == "delete":
                     c.execute("DELETE FROM chunks WHERE src=?", (req["id"],)); c.execute("DELETE FROM sources WHERE id=?", (req["id"],)); c.commit()
-                    shutil.rmtree(os.path.join(WS, nb, req["id"]), ignore_errors=True)
+                    shutil.rmtree(ws_dir(ws, nb, req["id"]), ignore_errors=True)
                     return self._send({"ok": True})
                 emit = self._sse()
                 file = None
                 if req.get("file_b64"):
                     name = re.sub(r"[^\w.\-가-힣 ]", "_", os.path.basename(req.get("file_name") or "upload.bin"))
-                    os.makedirs(os.path.join(WS, "_upload"), exist_ok=True)
-                    file = os.path.join(WS, "_upload", name)
+                    os.makedirs(os.path.join(ws, "_upload"), exist_ok=True)
+                    file = os.path.join(ws, "_upload", name)
                     with open(file, "wb") as f:
                         f.write(base64.b64decode(req["file_b64"]))
                 try:
-                    emit({"done": add_source(nb, req.get("file_name") or req.get("name") or "붙여넣은 글", req.get("text"), file, req.get("model") or MODEL, emit)})
+                    emit({"done": add_source(nb, req.get("file_name") or req.get("name") or "붙여넣은 글", req.get("text"), file, req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
                     emit({"error": f"{type(e).__name__}: {e}"})
                 finally:
@@ -574,7 +597,7 @@ class H(BaseHTTPRequestHandler):
             if what == "chat":
                 emit = self._sse()
                 try:
-                    emit({"done": ask(nb, (req.get("question") or "").strip(), req.get("history") or "", req.get("model") or MODEL, emit)})
+                    emit({"done": ask(nb, (req.get("question") or "").strip(), req.get("history") or "", req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
                     emit({"error": f"{type(e).__name__}: {e}"})
                 return
@@ -588,13 +611,13 @@ class H(BaseHTTPRequestHandler):
                 elif op == "to_source":
                     n = c.execute("SELECT * FROM notes WHERE id=?", (req["id"],)).fetchone()
                     c.commit()
-                    return self._send(add_source(nb, "노트: " + n["title"], n["body"], None, req.get("model") or MODEL))
+                    return self._send(add_source(nb, "노트: " + n["title"], n["body"], None, req.get("model") or MODEL, ws=ws))
                 c.commit()
                 return self._send({"ok": True})
             if what == "studio":
                 emit = self._sse()
                 try:
-                    emit({"done": studio(nb, req.get("kind"), req.get("model") or MODEL, emit)})
+                    emit({"done": studio(nb, req.get("kind"), req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
                     emit({"error": f"{type(e).__name__}: {e}"})
                 return
@@ -629,4 +652,4 @@ if __name__ == "__main__":
     if not os.path.exists(_CLI):
         sys.exit("node_modules/kordoc 없음 — 이 폴더에서 `npm install` 또는 pack.sh 번들을 쓰세요")
     print(f"notebook local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} model={MODEL} embed={EMBED_MODEL} tts={TTS_BASE or '없음'})  {_SIG}")
-    ThreadingHTTPServer(("", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
