@@ -2,6 +2,8 @@
 
 문서를 노트북에 모아 두고, 질문에 맞는 발췌를 찾아 **출처 번호 `[1]`을 달아** 답하는 로컬 LLM 노트북입니다(Google NotebookLM을 폐쇄망용으로 가볍게 다시 만든 것). 인용 번호를 누르면 근거 문단이 열립니다.
 
+> ⚠️ 연구·내부 시험용 프로토타입입니다(배포·상업 서비스용 아님). 제3자 구성요소의 라이선스는 THIRD_PARTY_NOTICES.md 를 확인하세요.
+
 ![Notebook 실행 화면 — ① 포함된 출처 ② 답변과 근거 ③ 스튜디오](docs/img/notebook-usage.png)
 
 ## 무엇을 하나
@@ -107,12 +109,18 @@ WITH_NODE=1 ./pack.sh          # Node 바이너리까지
 ## 출처·감사 (Credits)
 
 - [kordoc](https://github.com/chrisryugj/kordoc) (MIT, chrisryugj) — 문서 파싱·OCR (npm 에서 수정 없이 설치, `LICENSE-kordoc`)
-- 기획 참고: Google NotebookLM (코드 공유 없음). 임베딩(예: [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3), MIT)·TTS 서버(기본 설정은 [tts-local](https://github.com/gggg8657/tts-local)의 MeloTTS, 또는 Kokoro(Apache-2.0) 등 OpenAI 호환)는 환경변수로 연결하는 외부 서비스
-- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- 기획 참고: Google NotebookLM (코드·화면 자산 공유 없음, Google 과 무관). 임베딩(예: [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3), MIT)·TTS 서버(기본 설정은 [tts-local](https://github.com/gggg8657/tts-local)의 MeloTTS, 또는 Kokoro(Apache-2.0) 등 OpenAI 호환)는 환경변수로 연결하는 외부 서비스
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma 4](https://huggingface.co/google/gemma-4-31B-it) `gemma4:31b` (모델 카드 기준 Apache-2.0). `LLM_MODEL` 을 주지 않으면 코드 기본값은 `qwen3:8b` ([Qwen3](https://huggingface.co/Qwen/Qwen3-8B), Apache-2.0). 다른 모델을 쓰면 그 모델의 라이선스를 확인하세요.
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
+- kordoc 의 npm 의존성(PDF·OCR 엔진, 이미지 처리용 libvips 는 LGPL-3.0-or-later)과 OCR 모델은 THIRD_PARTY_NOTICES.md 에 적었습니다. **폐쇄망 번들(`pack.sh`)을 외부에 넘길 때**는 [#1](https://github.com/gggg8657/notebook-local/issues/1) 을, 수식 OCR 모델은 [#2](https://github.com/gggg8657/notebook-local/issues/2) 를 보세요(이 도구는 수식 OCR 을 켜지 않음).
+- "NotebookLM" 은 Google 의 상표이며 이 도구는 Google 과 관계가 없습니다 — 명칭 표현 검토는 [#3](https://github.com/gggg8657/notebook-local/issues/3).
 
-저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+저작권 표기는 `NOTICE`, 제3자 구성요소 전체 목록·라이선스·상업 이용 확인 사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 를 보세요.
 
 ## 라이선스
 
 [MIT License](LICENSE) — kordoc © chrisryugj(`LICENSE-kordoc`), 이 패키지에서 작성한 파일 © gggg8657.
+
+## 만든 사람
+
+DongJu Kim (gggg8657) — 설계·구현 (문서 파서 kordoc: chrisryugj)
