@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""notebook local — NotebookLM 클론(경량). 문서를 올리면 출처 인용 채팅·노트·스튜디오(요약·FAQ·팟캐스트).
+"""notebook local — 소스 기반 노트북(경량). 문서를 올리면 출처 인용 채팅·노트·스튜디오(요약·FAQ·팟캐스트).
 외부 파이썬 의존성 없음(stdlib). 문서 파싱은 같은 폴더 node_modules 의 kordoc(npm install 한 번).
 
   npm install && python3 app.py                       # http://localhost:8769

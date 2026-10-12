@@ -29,7 +29,7 @@ banner() {
   ██║ ╚████║╚██████╔╝   ██║   ███████╗██████╔╝╚██████╔╝╚██████╔╝██║  ██╗
   ╚═╝  ╚═══╝ ╚═════╝    ╚═╝   ╚══════╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝  local
 EOF2
-  printf '%s  %sNotebookLM 클론 — 출처 인용 채팅·노트·스튜디오·팟캐스트%s   %s(파서: github.com/chrisryugj/kordoc · MIT)%s\n\n' "$N" "$B" "$N" "$D" "$N"
+  printf '%s  %s소스 기반 노트북 — 출처 인용 채팅·노트·스튜디오·팟캐스트%s   %s(파서: github.com/chrisryugj/kordoc · MIT)%s\n\n' "$N" "$B" "$N" "$D" "$N"
 }
 step() { STEP=$((STEP+1)); printf '  %s[%d/9]%s %s%-14s%s ' "$D" "$STEP" "$N" "$B" "$1" "$N"; }
 ok()   { printf '%s✔%s %s\n' "$G" "$N" "${1:-}"; }

@@ -17,7 +17,7 @@
 | BAAI bge-m3 (`bge-m3`) | — | 가중치 — 임베딩(`EMBED_MODEL` 기본값, setup 이 `ollama pull` 시도; 없으면 BM25) | MIT (모델 카드 `BAAI/bge-m3`) | https://huggingface.co/BAAI/bge-m3 | 가능 | |
 | MeloTTS 한국어 (tts-local 경유) | — | 외부 — 팟캐스트 음성(`TTS_BASE_URL` 을 줄 때만) | MIT (모델 카드 `myshell-ai/MeloTTS-Korean`) | https://github.com/myshell-ai/MeloTTS · https://github.com/gggg8657/tts-local | 가능 | 다른 OpenAI 호환 TTS(예: Kokoro, Apache-2.0)로 대체 가능 |
 | kordoc-local 윤문 API | — | 외부 — ✍ 윤문하기(`KORDOC_URL`) | MIT (같은 저작자) | https://github.com/gggg8657/kordoc-local | 가능 | 선택 기능 |
-| Google NotebookLM | — | 기획 참고만 (코드·화면 자산 없음) | — (Google 상표) | https://notebooklm.google | — | 아래 "확인 필요" |
+| Google NotebookLM | — | 기획 참고만 (코드·화면 자산·로고 없음) | — (Google 상표) | https://notebooklm.google | — | 제품 이름·설명에 쓰지 않음, README Credits 에 비교 언급 한 번만 ([#3](https://github.com/gggg8657/notebook-local/issues/3) 처리됨) |
 
 ### kordoc 의 의존성 (`npm install` 로 설치, 저장소에 없음)
 
@@ -50,7 +50,7 @@ kordoc 자체가 포함한 파생 코드와 서식 자산(kordoc `NOTICE`·`THIR
 
 - [#1](https://github.com/gggg8657/notebook-local/issues/1) **폐쇄망 번들(pack.sh) 재배포 — sharp/libvips LGPL-3.0-or-later 외** — `pack.sh` 의 오프라인 번들은 node_modules(libvips LGPL-3.0-or-later 포함)·OCR 모델(Apache-2.0)·선택 시 Node.js 를 함께 묶는다. 번들을 외부에 넘기면 재배포가 되므로 라이선스 사본·고지 동봉 필요. 회피: 내부 시험용으로만 쓰기, 넘길 때 이 파일과 `node_modules/kordoc/NOTICE`·`THIRD_PARTY/` 를 번들 최상위에 복사, PDF·OCR 이 필요 없으면 `--omit=optional` 로 sharp/libvips 제외.
 - [#2](https://github.com/gggg8657/notebook-local/issues/2) **Pix2Text 수식 검출 모델(MFD) — MIT / YOLOv8 AGPL-3.0 기반** — kordoc 의 수식 OCR 모델 MFD 는 MIT 표기지만 YOLOv8(AGPL-3.0) 기반. 이 도구는 `--formula-ocr` 를 쓰지 않아 평소엔 받지 않는다. 회피: 계속 끈 채로 쓰고, 번들 전 `kordoc models --status` 로 수식 모델이 캐시에 섞이지 않았는지 확인.
-- [#3](https://github.com/gggg8657/notebook-local/issues/3) **"NotebookLM" 명칭 — Google 상표** — README·package.json·app.py 설명에 "NotebookLM 클론" 표현. 저작권이 아닌 상표·오인 표시 문제로 확인 필요. 회피: "출처 인용형 문서 노트북" 같은 일반 명칭으로 바꾸고 Google 과 무관함을 밝히기(제안).
+- ~~[#3](https://github.com/gggg8657/notebook-local/issues/3) "NotebookLM" 명칭 — Google 상표~~ — 처리됨(2026-10-12): 제품 설명의 "NotebookLM 클론" 표현을 "소스 기반 노트북"으로 바꾸고, README Credits 에 사실 비교 한 번과 Google 무관 고지만 남김.
 
 ## 이 저장소의 원저작물
 
