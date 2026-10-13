@@ -16,7 +16,7 @@
 | Qwen3 8B (`qwen3:8b`) | — | 가중치 (`LLM_MODEL` 을 안 줄 때 코드·setup 기본값, Ollama 에 모델이 없으면 `ollama pull`) | Apache-2.0 (모델 카드 `Qwen/Qwen3-8B`) | https://huggingface.co/Qwen/Qwen3-8B | 가능 | 저장소에 넣지 않음 |
 | BAAI bge-m3 (`bge-m3`) | — | 가중치 — 임베딩(`EMBED_MODEL` 기본값, setup 이 `ollama pull` 시도; 없으면 BM25) | MIT (모델 카드 `BAAI/bge-m3`) | https://huggingface.co/BAAI/bge-m3 | 가능 | |
 | MeloTTS 한국어 (tts-local 경유) | — | 외부 — 팟캐스트 음성(`TTS_BASE_URL` 을 줄 때만) | MIT (모델 카드 `myshell-ai/MeloTTS-Korean`) | https://github.com/myshell-ai/MeloTTS · https://github.com/gggg8657/tts-local | 가능 | 다른 OpenAI 호환 TTS(예: Kokoro, Apache-2.0)로 대체 가능 |
-| kordoc-local 윤문 API | — | 외부 — ✍ 윤문하기(`KORDOC_URL`) | MIT (같은 저작자) | https://github.com/gggg8657/kordoc-local | 가능 | 선택 기능 |
+| kordoc-local 윤문 API | — | 외부 — ✍ 윤문하기(`KORDOC_URL`) | PolyForm Noncommercial 1.0.0 (같은 저작자; kordoc 자체는 MIT) | https://github.com/gggg8657/kordoc-local | 비상업만 | 선택 기능 |
 | Google NotebookLM | — | 기획 참고만 (코드·화면 자산·로고 없음) | — (Google 상표) | https://notebooklm.google | — | 제품 이름·설명에 쓰지 않음, README Credits 에 비교 언급 한 번만 ([#3](https://github.com/gggg8657/notebook-local/issues/3) 처리됨) |
 
 ### kordoc 의 의존성 (`npm install` 로 설치, 저장소에 없음)
@@ -54,4 +54,4 @@ kordoc 자체가 포함한 파생 코드와 서식 자산(kordoc `NOTICE`·`THIR
 
 ## 이 저장소의 원저작물
 
-위 표에 없는 파일(코드·UI·프롬프트·패턴·문서·설정 예시·selftest)은 DongJu Kim(gggg8657)이 작성했고 이 저장소의 `LICENSE`(MIT)를 따릅니다.
+위 표에 없는 파일(코드·UI·프롬프트·패턴·문서·설정 예시·selftest)은 DongJu Kim(gggg8657)이 작성했고 이 저장소의 `LICENSE`(PolyForm Noncommercial 1.0.0)를 따릅니다.
