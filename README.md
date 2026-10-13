@@ -53,7 +53,7 @@ A. 시범운영 담당자는 김동주 석사후연수생(인공지능응용연�
 bash setup.sh                     # OS → Python → Node·kordoc → LLM 탐색 → 임베딩 모델 → selftest → http://localhost:8769
 bash setup.sh stop
 npm install && python3 selftest.py && python3 app.py                       # 수동
-LLM_API=openai LLM_BASE_URL=http://gpu:8000/v1 LLM_MODEL=Qwen3-32B EMBED_MODEL=bge-m3 python3 app.py
+LLM_API=openai LLM_BASE_URL=http://gpu:8000/v1 LLM_MODEL=Qwen3-32B EMBED_MODEL=bge-m3 EMBED_BASE_URL=http://localhost:11434 python3 app.py  # 임베딩은 Ollama
 python3 app.py --cli add 노트북 문서.hwpx
 python3 app.py --cli ask 노트북 "예산은 얼마인가"
 python3 app.py --cli studio 노트북 podcast
@@ -65,7 +65,10 @@ python3 app.py --cli studio 노트북 podcast
 | `LLM_BASE_URL` | `http://localhost:11434` / `http://localhost:8000/v1` | LLM 서버 |
 | `LLM_MODEL` | `qwen3:8b` | 답변 모델 (UI 에서 변경 가능) |
 | `LLM_API_KEY` | (없음) | OpenAI 호환 서버 키 |
-| `EMBED_MODEL` | `bge-m3` | 임베딩 모델 (Ollama `/api/embed` 또는 `/v1/embeddings`). 실패하면 BM25 전용 |
+| `EMBED_MODEL` | `bge-m3` | 임베딩 모델. 실패하면 BM25 전용 |
+| `EMBED_API` | `ollama` | 임베딩 API: `ollama`(`/api/embed`) 또는 `openai`(`/embeddings`). 채팅 서버와 따로 정함 |
+| `EMBED_BASE_URL` | `LLM_API` 와 같은 종류면 `LLM_BASE_URL`, 아니면 `http://localhost:11434`(ollama) / `http://localhost:8000/v1`(openai) | 임베딩 서버. vLLM 처럼 채팅 서버에 임베딩이 없으면 여기에 Ollama 주소를 줌 |
+| `EMBED_API_KEY` | `LLM_API_KEY` | 임베딩 서버 키(openai 방식일 때) |
 | `TTS_BASE_URL` | (없음) | OpenAI 호환 `/v1/audio/speech` 서버 (예 `http://localhost:8771/v1`). 있으면 팟캐스트 mp3 생성 |
 | `TTS_MODEL` / `TTS_VOICE` | `melo` / `KR` | TTS 모델·목소리 ([tts-local](https://github.com/gggg8657/tts-local) MeloTTS 한국어 기준) |
 | `TTS_VOICE_A` / `TTS_VOICE_B` | `TTS_VOICE` 값 | 진행자 A/B 목소리 (화자를 여럿 지원하는 서버일 때만 다르게) |

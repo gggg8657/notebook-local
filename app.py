@@ -37,6 +37,12 @@ OLLAMA = LLM_BASE
 MODEL = os.environ.get("LLM_MODEL", "qwen3:8b")
 LLM_KEY = os.environ.get("LLM_API_KEY", "")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "bge-m3")
+# 임베딩은 채팅과 다른 서버일 수 있음(vLLM 채팅 서버엔 /v1/embeddings 가 없음). 기본은 Ollama /api/embed —
+# LLM_API=ollama 면 채팅과 같은 주소, openai 면 로컬 Ollama 기본 주소. EMBED_API=openai 면 OpenAI 호환 /embeddings.
+EMBED_API = os.environ.get("EMBED_API", "ollama")         # ollama | openai
+EMBED_BASE = os.environ.get("EMBED_BASE_URL", "").rstrip("/") or (
+    LLM_BASE if LLM_API == EMBED_API else ("http://localhost:8000/v1" if EMBED_API == "openai" else "http://localhost:11434"))
+EMBED_KEY = os.environ.get("EMBED_API_KEY", LLM_KEY)
 TTS_BASE = os.environ.get("TTS_BASE_URL", "").rstrip("/")   # OpenAI 호환 /v1/audio/speech (예: http://localhost:8771/v1)
 TTS_MODEL = os.environ.get("TTS_MODEL", "melo")
 _V = os.environ.get("TTS_VOICE", "KR")  # tts-local(MeloTTS 한국어)은 화자 1개 — 두 사람 목소리는 TTS_VOICE_A/B 로 따로 줄 수 있는 서버일 때만 다르다
@@ -151,11 +157,12 @@ def embed(texts):
     if not texts:
         return None
     try:
-        if LLM_API == "openai":
-            req = urllib.request.Request(LLM_BASE + "/embeddings", json.dumps({"model": EMBED_MODEL, "input": texts}).encode(), _hdr())
+        if EMBED_API == "openai":
+            hdr = {"Content-Type": "application/json", **({"Authorization": f"Bearer {EMBED_KEY}"} if EMBED_KEY else {})}
+            req = urllib.request.Request(EMBED_BASE + "/embeddings", json.dumps({"model": EMBED_MODEL, "input": texts}).encode(), hdr)
             with urllib.request.urlopen(req, timeout=600) as r:
                 return [d["embedding"] for d in json.load(r)["data"]]
-        req = urllib.request.Request(OLLAMA + "/api/embed", json.dumps({"model": EMBED_MODEL, "input": texts}).encode(), {"Content-Type": "application/json"})
+        req = urllib.request.Request(EMBED_BASE + "/api/embed", json.dumps({"model": EMBED_MODEL, "input": texts}).encode(), {"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=600) as r:
             return json.load(r)["embeddings"]
     except Exception as e:
@@ -217,8 +224,27 @@ def parse(path, d):
     return read(out)
 
 
+def _split_long(para, size):
+    """size 자를 넘는 문단을 줄 → 문장 → 글자 순으로 경계를 찾아 나눔(빈 줄 없는 문서·긴 표 대비)."""
+    if len(para) <= size:
+        return [para]
+    for sep in (r"(?<=\n)", r"(?<=[.!?。！？])\s+"):
+        parts = [x for x in re.split(sep, para) if x and x.strip()]
+        if len(parts) > 1:
+            out, cur = [], ""
+            for x in parts:
+                if cur and len(cur) + len(x) + 1 > size:
+                    out.append(cur); cur = ""
+                cur = (cur + ("" if cur.endswith("\n") or not cur else " ") + x) if cur else x
+            if cur:
+                out.append(cur)
+            return [y for c in out for y in _split_long(c.strip(), size)]
+    return [para[i:i + size] for i in range(0, len(para), size)]
+
+
 def chunk_text(md, size=CHUNK, overlap=OVERLAP):
-    """헤딩 breadcrumb 를 붙인 ~size 자 청크. 문단 단위로 쌓고 넘치면 자름, 앞 청크 꼬리 overlap 자를 앞에 붙임."""
+    """헤딩 breadcrumb 를 붙인 ~size 자 청크. 문단 단위로 쌓고 넘치면 줄·문장 경계에서 자름, 앞 청크 꼬리 overlap 자를 앞에 붙임.
+    헤딩은 줄 단위로 찾음 — 빈 줄 없이 '# 제목' 바로 다음 줄에 본문이 와도 본문이 빠지지 않게."""
     crumbs, out, buf, tail = [], [], [], ""
 
     def flush():
@@ -229,21 +255,30 @@ def chunk_text(md, size=CHUNK, overlap=OVERLAP):
             tail = body[-overlap:] if overlap else ""
         buf = []
 
-    for para in re.split(r"\n\s*\n", md):
+    def add(para):
         para = para.strip()
         if not para:
-            continue
-        m = re.match(r"^(#{1,6})\s+(.*)", para)
-        if m:
-            flush()
-            lvl = len(m.group(1))
-            crumbs[:] = crumbs[:lvl - 1] + [m.group(2).strip()]
-            continue
-        while len(para) > size:  # 긴 문단(표 등)은 강제 분할
-            buf.append(para[:size]); flush(); para = para[size:]
-        if sum(len(p) for p in buf) + len(para) > size:
-            flush()
-        buf.append(para)
+            return
+        for piece in _split_long(para, size):
+            if buf and sum(len(p) for p in buf) + len(piece) > size:
+                flush()
+            buf.append(piece)
+
+    fence = False
+    for block in re.split(r"\n\s*\n", md):
+        cur = []
+        for line in block.split("\n"):
+            if line.lstrip().startswith("```"):
+                fence = not fence
+            m = None if fence else re.match(r"^(#{1,6})\s+(.*)", line.strip())
+            if m:
+                add("\n".join(cur)); cur = []
+                flush()
+                lvl = len(m.group(1))
+                crumbs[:] = crumbs[:lvl - 1] + [m.group(2).strip()]
+            else:
+                cur.append(line)
+        add("\n".join(cur))
     flush()
     return out
 
