@@ -687,4 +687,4 @@ if __name__ == "__main__":
     if not os.path.exists(_CLI):
         sys.exit("node_modules/kordoc 없음 — 이 폴더에서 `npm install` 또는 pack.sh 번들을 쓰세요")
     print(f"notebook local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} model={MODEL} embed={EMBED_MODEL} tts={TTS_BASE or '없음'})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "notebook-local")).serve_forever()
