@@ -28,6 +28,7 @@ import urllib.error
 import urllib.request
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
@@ -172,7 +173,7 @@ def embed(texts):
 
 def tts(text, voice):
     body = {"model": TTS_MODEL, "input": text, "voice": voice, "response_format": "mp3"}
-    req = urllib.request.Request(TTS_BASE + "/audio/speech", json.dumps(body).encode(), _hdr())
+    req = urllib.request.Request(TTS_BASE + "/audio/speech", json.dumps(body).encode(), {"Content-Type": "application/json", **portal_auth.sign("_service")})   # LLM 키는 TTS 로 안 보냄
     with urllib.request.urlopen(req, timeout=600) as r:
         return r.read()
 
@@ -494,7 +495,7 @@ KORDOC_URL = os.environ.get("KORDOC_URL", "http://localhost:8766").rstrip("/")
 
 def polish_remote(text, strength="standard"):
     req = urllib.request.Request(KORDOC_URL + "/api/polish_text", json.dumps({"text": text, "strength": strength}).encode(),
-                                 {"Content-Type": "application/json"})
+                                 {"Content-Type": "application/json", **portal_auth.sign("_service")})   # 도구 간 호출도 포털 서명(portal_auth)
     try:
         with urllib.request.urlopen(req, timeout=1800) as r:
             return json.load(r)
@@ -504,7 +505,7 @@ def polish_remote(text, strength="standard"):
 
 def polish_ok():
     try:
-        urllib.request.urlopen(KORDOC_URL + "/api/models", timeout=2)
+        urllib.request.urlopen(KORDOC_URL + "/healthz", timeout=2)   # 켜짐 확인은 표준 헬스로(LLM 을 부르지 않음, 서명 불필요)
         return True
     except Exception:
         return False
@@ -573,11 +574,13 @@ class H(BaseHTTPRequestHandler):
             if m:
                 with open(os.path.join(ws_dir(ws, m.group(1)), "audio", m.group(2)), "rb") as f:
                     return self._send(f.read(), "audio/mpeg")
+            if self.path.split("?")[0].startswith("/api/"):   # 없는 API 경로는 화면 대신 JSON 404
+                return self._send({"error": "not found"}, code=404)
             self._send(signed(HTML).encode(), "text/html; charset=utf-8")
         except (FileNotFoundError, ValueError):
             self._send({"error": "없음"}, code=404)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=500)
 
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"{}")
@@ -624,7 +627,7 @@ class H(BaseHTTPRequestHandler):
                 try:
                     emit({"done": add_source(nb, req.get("file_name") or req.get("name") or "붙여넣은 글", req.get("text"), file, req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
-                    emit({"error": f"{type(e).__name__}: {e}"})
+                    emit({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")})
                 finally:
                     if file:
                         os.remove(file)
@@ -634,7 +637,7 @@ class H(BaseHTTPRequestHandler):
                 try:
                     emit({"done": ask(nb, (req.get("question") or "").strip(), req.get("history") or "", req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
-                    emit({"error": f"{type(e).__name__}: {e}"})
+                    emit({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")})
                 return
             if what == "note":
                 op = req.get("op", "save")
@@ -654,10 +657,10 @@ class H(BaseHTTPRequestHandler):
                 try:
                     emit({"done": studio(nb, req.get("kind"), req.get("model") or MODEL, emit, ws)})
                 except Exception as e:
-                    emit({"error": f"{type(e).__name__}: {e}"})
+                    emit({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")})
                 return
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=500)
 
 
 def _cli_nb(name):
@@ -687,4 +690,4 @@ if __name__ == "__main__":
     if not os.path.exists(_CLI):
         sys.exit("node_modules/kordoc 없음 — 이 폴더에서 `npm install` 또는 pack.sh 번들을 쓰세요")
     print(f"notebook local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} model={MODEL} embed={EMBED_MODEL} tts={TTS_BASE or '없음'})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "notebook-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "notebook-local")).serve_forever()
