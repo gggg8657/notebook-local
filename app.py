@@ -30,6 +30,17 @@ from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
+try:
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo("Asia/Seoul")
+except Exception:  # tzdata 없는 환경 — 한국은 일광절약시간 없음
+    KST = datetime.timezone(datetime.timedelta(hours=9), "KST")
+
+
+def now_kst():
+    """스튜디오 노트 제목의 날짜는 한국 날짜 — 서버는 UTC"""
+    return datetime.datetime.now(KST)
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
 LLM_API = os.environ.get("LLM_API", "ollama")            # ollama | openai (vLLM·LM Studio·llama.cpp 등)
@@ -433,7 +444,7 @@ def studio(nb, kind, model=MODEL, emit=lambda ev: None, ws=None):
     emit({"stage": "llm", "msg": f"{STUDIO_LABEL[kind]} 생성 ({model})", "reset": True})
     out = _clean(ollama(common + "\n\n" + roles[kind], text + ("\n\n(※ 출처가 길어 앞부분만 제공됨)" if truncated else ""), model,
                         on_token=lambda t: emit({"token": t})))
-    title = f"{STUDIO_LABEL[kind]} · {datetime.date.today()}"
+    title = f"{STUDIO_LABEL[kind]} · {now_kst().date()}"
     note_id = nid()
     audio = None
     if kind == "podcast" and TTS_BASE:
