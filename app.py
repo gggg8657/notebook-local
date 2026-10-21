@@ -184,7 +184,7 @@ def embed(texts):
 
 def tts(text, voice):
     body = {"model": TTS_MODEL, "input": text, "voice": voice, "response_format": "mp3"}
-    req = urllib.request.Request(TTS_BASE + "/audio/speech", json.dumps(body).encode(), {"Content-Type": "application/json", **portal_auth.sign("_service")})   # LLM 키는 TTS 로 안 보냄
+    req = urllib.request.Request(TTS_BASE + "/audio/speech", json.dumps(body).encode(), {"Content-Type": "application/json", **portal_auth.sign("_service", "tts-local")})   # LLM 키는 TTS 로 안 보냄
     with urllib.request.urlopen(req, timeout=600) as r:
         return r.read()
 
@@ -506,7 +506,7 @@ KORDOC_URL = os.environ.get("KORDOC_URL", "http://localhost:8766").rstrip("/")
 
 def polish_remote(text, strength="standard"):
     req = urllib.request.Request(KORDOC_URL + "/api/polish_text", json.dumps({"text": text, "strength": strength}).encode(),
-                                 {"Content-Type": "application/json", **portal_auth.sign("_service")})   # 도구 간 호출도 포털 서명(portal_auth)
+                                 {"Content-Type": "application/json", **portal_auth.sign("_service", "kordoc-local")})   # 도구 간 호출도 포털 서명(portal_auth)
     try:
         with urllib.request.urlopen(req, timeout=1800) as r:
             return json.load(r)
