@@ -63,6 +63,48 @@ if os.path.exists(app._CLI) and os.path.exists(sample):
 else:
     print("kordoc 생략 (node_modules 또는 샘플 없음)")
 
+# 7) 브라우저가 떠나도(첫 이벤트 뒤 쓰기가 BrokenPipeError) 출처 추가·스튜디오는 끝까지 — 노트북에 남고 서버 오류·트레이스백 없음
+import json
+import io, sys, tempfile, threading, urllib.request
+from http.server import ThreadingHTTPServer
+class Cut:
+    def __init__(s, f, n): s.f, s.n = f, n
+    def write(s, b):
+        s.n -= 1
+        if s.n < 0: raise BrokenPipeError(32, "Broken pipe")
+        return s.f.write(b)
+    def flush(s): pass
+    def __getattr__(s, k): return getattr(s.f, k)
+class CutH(app.H):
+    def setup(s): super().setup(); s.wfile = Cut(s.wfile, 2)  # 응답 머리 + 첫 이벤트까지만 닿음
+ERRS = []
+class Srv(ThreadingHTTPServer):
+    def handle_error(s, req, addr): ERRS.append(sys.exc_info()[1])
+def cut_post(path, body, user="alice"):
+    srv = Srv(("127.0.0.1", 0), CutH); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    err0, sys.stderr = sys.stderr, io.StringIO()
+    try:
+        r = urllib.request.Request(f"http://127.0.0.1:{srv.server_address[1]}{path}", json.dumps(body).encode(), {"Content-Type": "application/json", "X-Agent-User": user})
+        got = urllib.request.urlopen(r).read().decode()
+    finally:
+        cap, sys.stderr = sys.stderr.getvalue(), err0
+    srv.shutdown(); srv.server_close()
+    assert got.count("data: ") == 1 and not ERRS and "Traceback" not in cap and cap.count("연결 끊김") == 1, (got, ERRS, cap)
+    return got
+def fake2(system, user, model, on_token=None):
+    for part in ("A: 떠난 ", "뒤\nB: 대본"):
+        on_token and on_token(part)
+    return "A: 떠난 뒤\nB: 대본"
+app.ollama, app.embed = fake2, fake_embed
+AW = os.path.join(app.WS, "u", "alice"); os.makedirs(AW, exist_ok=True)
+anb = app.nid(); ac = app.db(AW); ac.execute("INSERT INTO notebooks VALUES(?,?,?)", (anb, "떠남", app.now())); ac.commit()
+cut_post(f"/api/nb/{anb}/source", {"name": "떠난 뒤 출처", "text": md})
+cut_post(f"/api/nb/{anb}/studio", {"kind": "podcast"})
+ac = app.db(AW)
+assert ac.execute("SELECT count(*) FROM sources WHERE nb=? AND name=?", (anb, "떠난 뒤 출처")).fetchone()[0] == 1
+assert ac.execute("SELECT count(*) FROM chunks WHERE nb=?", (anb,)).fetchone()[0] >= 2
+assert [r[0] for r in ac.execute("SELECT body FROM notes WHERE nb=?", (anb,))] == ["A: 떠난 뒤\nB: 대본"]
+
 shutil.rmtree(app.WS)
 # 저작권 표기: 서버가 화면에 붙이는 코드가 있어야 한다 (LICENSE·NOTICE)
 _src = open(__import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "app.py"), encoding="utf-8").read()
